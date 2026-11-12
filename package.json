@@ -21,7 +21,7 @@
     "test": "npm run build >/dev/null && node --test test/*.test.mjs"
   },
   "devDependencies": {
-    "@types/node": "^26.1.2",
+    "@types/node": "^26.6.6",
     "typescript": "^7.0.2"
   },
   "keywords": [
