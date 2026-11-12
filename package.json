@@ -33,11 +33,15 @@
     "fast",
     "lightweight",
     "zero-dependency",
+    "compiler",
+    "components",
+    "jsx-parser",
+    "interactive-docs",
+    "docmd",
     "typescript",
     "javascript",
     "nodejs",
-    "browser",
-    "docmd"
+    "browser"
   ],
   "author": {
     "name": "Ghazi",
@@ -45,13 +49,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/docmd-io/lite-mdx.git",
-    "directory": "lite-mdx"
+    "url": "git+https://github.com/docmd-io/lite-mdx.git"
   },
   "bugs": {
     "url": "https://github.com/docmd-io/lite-mdx/issues"
   },
   "homepage": "https://docmd.io",
-  "funding": "https://github.com/sponsors/mgks",
+  "funding": "https://github.com/sponsors/docmd-io",
   "license": "MIT"
 }
