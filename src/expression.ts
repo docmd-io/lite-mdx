@@ -32,12 +32,19 @@ export function safeEval(expr: string, scope: Record<string, any> = {}): any {
   if (trimmed === 'null') return null;
   if (trimmed === 'undefined') return undefined;
   if (/^-?\d+(\.\d+)?$/.test(trimmed)) return Number(trimmed);
-  if (
-    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
-    (trimmed.startsWith("'") && trimmed.endsWith("'")) ||
-    (trimmed.startsWith('`') && trimmed.endsWith('`'))
-  ) {
-    return trimmed.slice(1, -1);
+  // Exact single quoted string literal (without operations/methods)
+  if (/^"([^"\\]|\\.)*"$/.test(trimmed)) {
+    try {
+      return JSON.parse(trimmed);
+    } catch {
+      return trimmed.slice(1, -1);
+    }
+  }
+  if (/^'([^'\\]|\\.)*'$/.test(trimmed)) {
+    return trimmed.slice(1, -1).replace(/\\'/g, "'").replace(/\\\\/g, "\\");
+  }
+  if (/^`([^`\\]|\\.)*`$/.test(trimmed)) {
+    return trimmed.slice(1, -1).replace(/\\`/g, "`").replace(/\\\\/g, "\\");
   }
 
   // 2. Direct property path fast path (e.g. "frontmatter.title" or "config.siteTitle")

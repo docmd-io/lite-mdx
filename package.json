@@ -1,6 +1,6 @@
 {
   "name": "lite-mdx",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Ultra lightweight, zero-dependency MDX and JSX compiler for markdown engines and browsers.",
   "type": "module",
   "files": [

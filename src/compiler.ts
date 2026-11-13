@@ -42,19 +42,59 @@ function propsToHtmlAttrs(props: Record<string, any>): string {
  * and unescapes `\{` and `\}`.
  */
 function evaluateTextExpressions(text: string, scope: Record<string, any>): string {
-  // Matches {expression} outside of escaped \{}
-  const exprRegex = /(?<!\\)\{([^}\r\n]+)\}/g;
-  let evaluated = text.replace(exprRegex, (match, expr) => {
-    const trimmed = expr.trim();
-    if (!trimmed) return match;
-    const res = safeEval(trimmed, scope);
-    if (res === undefined) return '';
-    if (typeof res === 'object') return JSON.stringify(res);
-    return String(res);
-  });
+  let result = '';
+  let i = 0;
 
-  // Unescape \ { and \ }
-  return evaluated.replace(/\\\{/g, '{').replace(/\\\}/g, '}');
+  while (i < text.length) {
+    // Check for escaped \{ or \}
+    if (text[i] === '\\' && (text[i + 1] === '{' || text[i + 1] === '}')) {
+      result += text[i + 1];
+      i += 2;
+      continue;
+    }
+
+    if (text[i] === '{') {
+      let depth = 1;
+      let inStr: string | null = null;
+      let j = i + 1;
+      while (j < text.length && depth > 0) {
+        const c = text[j];
+        if (inStr) {
+          if (c === '\\' && j + 1 < text.length) {
+            j += 2;
+            continue;
+          }
+          if (c === inStr) inStr = null;
+        } else {
+          if (c === '"' || c === "'" || c === '`') {
+            inStr = c;
+          } else if (c === '{') {
+            depth++;
+          } else if (c === '}') {
+            depth--;
+          }
+        }
+        if (depth > 0) j++;
+      }
+
+      if (depth === 0) {
+        const expr = text.slice(i + 1, j).trim();
+        if (expr) {
+          const res = safeEval(expr, scope);
+          if (res !== undefined) {
+            result += typeof res === 'object' ? JSON.stringify(res) : String(res);
+          }
+        }
+        i = j + 1;
+        continue;
+      }
+    }
+
+    result += text[i];
+    i++;
+  }
+
+  return result;
 }
 
 /**

@@ -195,3 +195,17 @@ test('12. Escaped expression \\{expr\\} is not evaluated', () => {
   const res = evaluate(mdx);
   assert.ok(res.includes('{2 + 2}'));
 });
+
+test('13. String expressions with method calls and concatenation', () => {
+  const mdx = `Domain: {'DOCMD'.toLowerCase() + '.io'}`;
+  const res = evaluate(mdx);
+  assert.equal(res, 'Domain: docmd.io');
+});
+
+test('14. Multiline expression and nested braces', () => {
+  const mdx = `Value: {
+    'a' + 'b'
+  }`;
+  const res = evaluate(mdx);
+  assert.equal(res, 'Value: Value: ab'.replace('Value: Value:', 'Value:'));
+});
