@@ -5,7 +5,7 @@
  */
 
 import { MdxCompileOptions, MdxResult, ParsedJsxTag } from './types.js';
-import { safeEval } from './expression.js';
+import { safeEval, safeEvalResult } from './expression.js';
 import {
   protectFences,
   restoreFences,
@@ -78,12 +78,20 @@ function evaluateTextExpressions(text: string, scope: Record<string, any>): stri
       }
 
       if (depth === 0) {
+        const rawWithBraces = text.slice(i, j + 1);
         const expr = text.slice(i + 1, j).trim();
         if (expr) {
-          const res = safeEval(expr, scope);
-          if (res !== undefined) {
-            result += typeof res === 'object' ? JSON.stringify(res) : String(res);
+          const { success, value } = safeEvalResult(expr, scope);
+          if (success) {
+            result += value === undefined || value === null
+              ? ''
+              : (typeof value === 'object' ? JSON.stringify(value) : String(value));
+          } else {
+            // Unresolved or invalid expression - preserve raw text untouched
+            result += rawWithBraces;
           }
+        } else {
+          result += rawWithBraces;
         }
         i = j + 1;
         continue;

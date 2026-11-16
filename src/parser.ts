@@ -18,18 +18,73 @@ export interface FencedState {
  */
 export function protectFences(text: string): FencedState {
   const fences: string[] = [];
+  const lines = text.split('\n');
+  const outputLines: string[] = [];
 
-  // 1. Protect frontmatter
-  let cleaned = text.replace(/^(?:---[\r\n]+)([\s\S]*?)(?:[\r\n]+---(?:[\r\n]+|$))/, (match) => {
-    fences.push(match);
-    return `\x00DOCMD_LITEMDX_FENCE_${fences.length - 1}\x00\n`;
-  });
+  let inFence = false;
+  let fenceChar = '';
+  let fenceLength = 0;
+  let fenceBuffer: string[] = [];
 
-  // 2. Protect multi-line code fences (``` or ~~~)
-  cleaned = cleaned.replace(/(```|~~~)[a-zA-Z0-9_-]*[\r\n][\s\S]*?\1/g, (match) => {
-    fences.push(match);
-    return `\x00DOCMD_LITEMDX_FENCE_${fences.length - 1}\x00`;
-  });
+  // 1. Frontmatter check at document start (must begin at line 0)
+  let startLine = 0;
+  if (lines.length > 0 && lines[0].replace(/\r$/, '') === '---') {
+    let fmEnd = -1;
+    for (let i = 1; i < lines.length; i++) {
+      if (lines[i].replace(/\r$/, '') === '---') {
+        fmEnd = i;
+        break;
+      }
+    }
+    if (fmEnd !== -1) {
+      const fmContent = lines.slice(0, fmEnd + 1).join('\n');
+      fences.push(fmContent);
+      outputLines.push(`\x00DOCMD_LITEMDX_FENCE_${fences.length - 1}\x00`);
+      startLine = fmEnd + 1;
+    }
+  }
+
+  // 2. Multi-line code fence blocks (``` or ~~~ with any info string, attributes, or titles)
+  for (let i = startLine; i < lines.length; i++) {
+    const line = lines[i];
+    const lineClean = line.replace(/\r$/, '');
+
+    if (!inFence) {
+      // 0-3 spaces of indentation, then 3+ backticks or tildes
+      const match = lineClean.match(/^[ \t]{0,3}(`{3,}|~{3,})(.*)$/);
+      if (match) {
+        const marker = match[1];
+        const info = match[2];
+        const ch = marker[0];
+        // CommonMark: backtick fence info strings cannot contain backticks
+        if (ch !== '`' || !info.includes('`')) {
+          inFence = true;
+          fenceChar = ch;
+          fenceLength = marker.length;
+          fenceBuffer = [line];
+          continue;
+        }
+      }
+      outputLines.push(line);
+    } else {
+      fenceBuffer.push(line);
+      // Closing fence: 0-3 spaces, same fence character, at least fenceLength count, optional whitespace after
+      const closeRegex = new RegExp(`^[ \\t]{0,3}${fenceChar}{${fenceLength},}[ \\t]*$`);
+      if (closeRegex.test(lineClean)) {
+        inFence = false;
+        fences.push(fenceBuffer.join('\n'));
+        outputLines.push(`\x00DOCMD_LITEMDX_FENCE_${fences.length - 1}\x00`);
+        fenceBuffer = [];
+      }
+    }
+  }
+
+  if (inFence && fenceBuffer.length > 0) {
+    fences.push(fenceBuffer.join('\n'));
+    outputLines.push(`\x00DOCMD_LITEMDX_FENCE_${fences.length - 1}\x00`);
+  }
+
+  let cleaned = outputLines.join('\n');
 
   // 3. Protect HTML comments
   cleaned = cleaned.replace(/<!--[\s\S]*?-->/g, (match) => {
@@ -37,8 +92,14 @@ export function protectFences(text: string): FencedState {
     return `\x00DOCMD_LITEMDX_FENCE_${fences.length - 1}\x00`;
   });
 
-  // 4. Protect inline code `...`
-  cleaned = cleaned.replace(/`[^`\r\n]+`/g, (match) => {
+  // 4. Protect <script> and <style> blocks
+  cleaned = cleaned.replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, (match) => {
+    fences.push(match);
+    return `\x00DOCMD_LITEMDX_FENCE_${fences.length - 1}\x00`;
+  });
+
+  // 5. Protect inline code (backticks without paragraph breaks)
+  cleaned = cleaned.replace(/(?<!`)(`+)(?!`)([^\r\n]+?)\1(?!`)/g, (match) => {
     fences.push(match);
     return `\x00DOCMD_LITEMDX_FENCE_${fences.length - 1}\x00`;
   });

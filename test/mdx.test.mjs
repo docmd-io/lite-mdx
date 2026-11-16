@@ -207,5 +207,70 @@ test('14. Multiline expression and nested braces', () => {
     'a' + 'b'
   }`;
   const res = evaluate(mdx);
-  assert.equal(res, 'Value: Value: ab'.replace('Value: Value:', 'Value:'));
+  assert.equal(res, 'Value: ab');
 });
+
+test('15. Code fence with filename and info string preserves JSON/JS object content untouched', () => {
+  const mdx = `# Configuration
+
+\`\`\`json "docmd.config.json"
+{
+  "navigation": [
+    { "title": "Home", "path": "/" }
+  ]
+}
+\`\`\`
+
+\`\`\`javascript "docmd.config.js"
+module.exports = {
+  title: "My Docs"
+};
+\`\`\`
+`;
+
+  const res = compile(mdx);
+  assert.ok(res.content.includes('"navigation": ['));
+  assert.ok(res.content.includes('{ "title": "Home", "path": "/" }'));
+  assert.ok(res.content.includes('module.exports = {'));
+  assert.ok(res.content.includes('title: "My Docs"'));
+});
+
+test('16. Tilde code fences and 4-backtick code fences preserve nested blocks', () => {
+  const mdx = `\`\`\`\`markdown
+\`\`\`json
+{ "nested": true }
+\`\`\`
+\`\`\`\`
+
+~~~python
+def hello():
+    return {"status": 200}
+~~~
+`;
+
+  const res = compile(mdx);
+  assert.ok(res.content.includes('{ "nested": true }'));
+  assert.ok(res.content.includes('return {"status": 200}'));
+});
+
+test('17. Inline code with curly braces and backticks preserved', () => {
+  const mdx = 'Configure with `{"theme": "default"}` and ``code with `backticks` and {a: 1}`` here.';
+  const res = compile(mdx);
+  assert.ok(res.content.includes('`{"theme": "default"}`'));
+  assert.ok(res.content.includes('``code with `backticks` and {a: 1}``'));
+});
+
+test('18. Unresolved expressions and invalid JS in prose preserve raw curly braces', () => {
+  const mdx = 'Syntax {invalid : syntax} and unmapped {not_a_variable} stays.';
+  const res = compile(mdx);
+  assert.ok(res.content.includes('{invalid : syntax}'));
+  assert.ok(res.content.includes('{not_a_variable}'));
+});
+
+test('19. CRLF line endings preserve fences and content with 100% fidelity', () => {
+  const mdx = '---\r\ntitle: test\r\n---\r\n\r\n```json "docmd.config.json"\r\n{\r\n  "a": 1\r\n}\r\n```\r\n';
+  const res = compile(mdx);
+  assert.ok(res.content.includes('"a": 1'));
+  assert.ok(res.content.includes('```json "docmd.config.json"'));
+});
+

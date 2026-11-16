@@ -19,48 +19,58 @@ const BLACKLIST_GLOBALS = [
   'document'
 ];
 
+export interface SafeEvalResult {
+  success: boolean;
+  value?: any;
+}
+
 /**
- * Safely evaluates an inline expression string against an isolated scope.
+ * Safely evaluates an inline expression string against an isolated scope,
+ * returning both a success indicator and the evaluated value.
  */
-export function safeEval(expr: string, scope: Record<string, any> = {}): any {
+export function safeEvalResult(expr: string, scope: Record<string, any> = {}): SafeEvalResult {
   const trimmed = expr.trim();
-  if (!trimmed) return '';
+  if (!trimmed) return { success: true, value: '' };
 
   // 1. Primitive literal fast paths
-  if (trimmed === 'true') return true;
-  if (trimmed === 'false') return false;
-  if (trimmed === 'null') return null;
-  if (trimmed === 'undefined') return undefined;
-  if (/^-?\d+(\.\d+)?$/.test(trimmed)) return Number(trimmed);
+  if (trimmed === 'true') return { success: true, value: true };
+  if (trimmed === 'false') return { success: true, value: false };
+  if (trimmed === 'null') return { success: true, value: null };
+  if (trimmed === 'undefined') return { success: true, value: undefined };
+  if (/^-?\d+(\.\d+)?$/.test(trimmed)) return { success: true, value: Number(trimmed) };
   // Exact single quoted string literal (without operations/methods)
   if (/^"([^"\\]|\\.)*"$/.test(trimmed)) {
     try {
-      return JSON.parse(trimmed);
+      return { success: true, value: JSON.parse(trimmed) };
     } catch {
-      return trimmed.slice(1, -1);
+      return { success: true, value: trimmed.slice(1, -1) };
     }
   }
   if (/^'([^'\\]|\\.)*'$/.test(trimmed)) {
-    return trimmed.slice(1, -1).replace(/\\'/g, "'").replace(/\\\\/g, "\\");
+    return { success: true, value: trimmed.slice(1, -1).replace(/\\'/g, "'").replace(/\\\\/g, "\\") };
   }
   if (/^`([^`\\]|\\.)*`$/.test(trimmed)) {
-    return trimmed.slice(1, -1).replace(/\\`/g, "`").replace(/\\\\/g, "\\");
+    return { success: true, value: trimmed.slice(1, -1).replace(/\\`/g, "`").replace(/\\\\/g, "\\") };
   }
 
   // 2. Direct property path fast path (e.g. "frontmatter.title" or "config.siteTitle")
   if (/^[a-zA-Z_$][a-zA-Z0-9_$.]*$/.test(trimmed)) {
     const parts = trimmed.split('.');
+    const rootVar = parts[0];
+    if (!(rootVar in scope)) {
+      return { success: false, value: undefined };
+    }
     let curr: any = scope;
     for (const p of parts) {
-      if (curr == null || typeof curr !== 'object') return undefined;
+      if (curr == null || typeof curr !== 'object') return { success: true, value: undefined };
       curr = curr[p];
     }
-    return curr;
+    return { success: true, value: curr };
   }
 
   // Security guard: block explicit eval calls
   if (/\beval\s*\(/.test(trimmed)) {
-    return undefined;
+    return { success: false, value: undefined };
   }
 
   // 3. Fallback expression evaluator with strict boundary isolation
@@ -74,8 +84,16 @@ export function safeEval(expr: string, scope: Record<string, any> = {}): any {
     const keys = Object.keys(sandboxScope);
     const values = Object.values(sandboxScope);
     const fn = new Function(...keys, `"use strict"; return (${trimmed});`);
-    return fn(...values);
+    const val = fn(...values);
+    return { success: true, value: val };
   } catch (err) {
-    return undefined;
+    return { success: false, value: undefined };
   }
+}
+
+/**
+ * Safely evaluates an inline expression string against an isolated scope.
+ */
+export function safeEval(expr: string, scope: Record<string, any> = {}): any {
+  return safeEvalResult(expr, scope).value;
 }

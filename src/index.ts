@@ -11,7 +11,7 @@
 
 export * from './types.js';
 export { compile, evaluate } from './compiler.js';
-export { safeEval } from './expression.js';
+export { safeEval, safeEvalResult, type SafeEvalResult } from './expression.js';
 export {
   parseAttributes,
   findNextJsxTag,
